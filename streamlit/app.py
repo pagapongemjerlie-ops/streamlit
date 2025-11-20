@@ -2,35 +2,25 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from snowflake_connect import load_reviews  # Your function to load data
+from snowflake_connect import load_reviews 
 from snowflake.snowpark import Session
 import google.generativeai as genai
 
-# -------------------------
-# Configure Gemini API Key
-# -------------------------
+
 genai.configure(api_key="AIzaSyA1uDEXoMYCCsIn06dGXPArgv08HV-wHyU")
 MODEL_NAME = "models/gemini-2.5-pro"
 gemini_model = genai.GenerativeModel(MODEL_NAME)
 
-# -------------------------
-# Streamlit page settings
-# -------------------------
+
 st.set_page_config(page_title="Snowflake Sentiment Dashboard + Gemini Chatbot", layout="wide")
 
-# -------------------------
-# Load Snowflake Data
-# -------------------------
+
 df = load_reviews()
 
-# -------------------------
-# Normalize column names
-# -------------------------
+
 df.columns = df.columns.str.strip().str.upper()
 
-# -------------------------
-# Ensure necessary columns exist
-# -------------------------
+
 required_columns = {
     "PRODUCT": "Unknown Product",
     "CARRIER": np.random.choice(["UPS", "FedEx", "DHL"], size=len(df)),
@@ -45,21 +35,17 @@ for col, default in required_columns.items():
     if col not in df.columns:
         df[col] = default
     elif col == "REVIEW_TEXT":
-        # Fill missing review text with placeholder
+        
         df[col] = df[col].fillna("No review text available")
 
-# -------------------------
-# Convert SENTIMENT_SCORE to numeric
-# -------------------------
+
 if "SENTIMENT_SCORE" not in df.columns:
     st.error("No SENTIMENT_SCORE column found!")
     st.stop()
 
 df["SENTIMENT_SCORE"] = pd.to_numeric(df["SENTIMENT_SCORE"], errors="coerce")
 
-# -------------------------
-# Sidebar Filters
-# -------------------------
+
 st.sidebar.header("Filters")
 products = st.sidebar.multiselect(
     "Select Product",
@@ -68,15 +54,11 @@ products = st.sidebar.multiselect(
 )
 filtered_df = df[df["PRODUCT"].isin(products)]
 
-# -------------------------
-# Data Preview
-# -------------------------
+
 st.subheader("📄 Data Preview")
 st.dataframe(filtered_df.head())
 
-# -------------------------
-# Average Sentiment by Product
-# -------------------------
+
 st.subheader("🌍 Average Sentiment Score by Product")
 region_sentiment = (
     filtered_df.groupby("PRODUCT")["SENTIMENT_SCORE"].mean().sort_values()
@@ -92,9 +74,7 @@ st.pyplot(fig)
 st.write("### ❗ Products with Most Negative Sentiment")
 st.write(region_sentiment.head())
 
-# -------------------------
-# Delivery Issues (Negative Sentiment)
-# -------------------------
+
 st.subheader("🚚 Delivery Issues (Negative Sentiment)")
 issues = filtered_df[(filtered_df["SENTIMENT_SCORE"] < 0) & (filtered_df["LATE"] == True)]
 
@@ -104,14 +84,12 @@ existing_cols = [c for c in display_cols if c in issues.columns]
 issue_table = issues[existing_cols]
 st.dataframe(issue_table)
 
-# -------------------------
-# Total Shipments by Carrier
-# -------------------------
+
 st.subheader("🚛 Total Shipments by Carrier")
 if "ORDER_ID" in filtered_df.columns:
     carrier_counts = filtered_df.groupby("CARRIER")["ORDER_ID"].count()
 else:
-    # fallback if ORDER_ID missing
+    
     carrier_counts = filtered_df.groupby("CARRIER").size()
 
 fig2, ax2 = plt.subplots()
@@ -120,9 +98,7 @@ ax2.set_ylabel("Number of Shipments")
 ax2.set_title("Shipments by Carrier")
 st.pyplot(fig2)
 
-# -------------------------
-# Avg Sentiment by Status
-# -------------------------
+
 st.subheader("📊 Average Sentiment by Shipping Status")
 status_sentiment = (
     filtered_df.groupby("STATUS")["SENTIMENT_SCORE"].mean().sort_values()
@@ -135,14 +111,12 @@ ax3.set_ylabel("Shipping Status")
 ax3.set_title("Avg Sentiment by Status")
 st.pyplot(fig3)
 
-# -------------------------
-# Snowpark Session for Cortex LLM
-# -------------------------
+
 from snowflake.snowpark import Session
 
 def get_snowpark_session():
     connection_parameters = {
-        "account": "IHIHVSG-YIC74668",  # correct Snowflake account format
+        "account": "IHIHVSG-YIC74668",  
         "user": "FUCK",
         "password": "Pikitpagapong174511",
         "role": "ACCOUNTADMIN",
@@ -153,9 +127,7 @@ def get_snowpark_session():
 session = get_snowpark_session()
 
 
-# -------------------------
-# Chatbot Section
-# -------------------------
+
 st.subheader("🤖 Chatbot Assistant")
 chatbot_option = st.radio("Select Chatbot", ["Cortex LLM", "Gemini AI"])
 
@@ -176,17 +148,17 @@ elif chatbot_option == "Gemini AI":
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    # Display chat history
+    
     for msg in st.session_state["messages"]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Chat input
+    
     if prompt := st.chat_input("Type your message for Gemini AI..."):
         st.chat_message("user").markdown(prompt)
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
-        # Generate Gemini response
+        
         try:
             response = gemini_model.generate_content(prompt)
             reply = response.text
@@ -195,3 +167,4 @@ elif chatbot_option == "Gemini AI":
 
         st.chat_message("assistant").markdown(reply)
         st.session_state["messages"].append({"role": "assistant", "content": reply})
+
